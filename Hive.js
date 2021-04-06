@@ -258,7 +258,7 @@ function distributeColours(number){
 function createHives() {
 
     // number must be a cube
-    var number = 8;
+    var number = 216;
 
     for (let index = 0; index < number; index++) {
 
