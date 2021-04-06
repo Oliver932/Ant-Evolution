@@ -1,41 +1,175 @@
 import {dist, checkAngle, vectorToAngle, angleBetween, angleRange, angleToVector} from './vectorFunctions.js';
-import {unitNames, unitTypes} from './unitData.js';
 import {scale, offset, frame} from './Settings.js';
 
 export default function smartTarget(item, units) {
 
-    var angle = undefined;
+    var angle = item.currentAngle;
 
-    var target = getClosest(item, units);
 
-    if (target != undefined) {
-        var dx = target.x - item.x;
-        var dy = target.y - item.y;
+    var data = confine(item, angle);
+    
+    if (data.confined == false) {
+        item.currentAngle = data.angle;
 
-        angle = retreatCheck(item, vectorToAngle(dx, dy));
-        angle = changeCurrentAngle(item, angle);
+    } else {
+
+        item.redirected = false;
+        var target = getClosest(item, units);
+
+
+        if (target != undefined && item.team.antData[item.type].viewRange > dist(item.x, item.y, target.x, target.y) + item.size + target.size && item.team.territoryRadius > dist(item.team.x, item.team.y, target.x, target.y)) {
+            
+            item.label = 'tracking';
+            var target = getClosest(item, units);
+
+            if (target != undefined) {
+                var dx = target.x - item.x;
+                var dy = target.y - item.y;
+
+                // angle = retreatCheck(item, vectorToAngle(dx, dy));
+                angle = vectorToAngle(dx, dy)
+            }
+
+            item.currentAngle = angle;
+        
+        } else {
+
+            item.label = 'searching'
+
+        }
     }
-
-    item.currentAngle = angle;
-
-    return angle;
-
-
 }
 
-function changeCurrentAngle(item, angle) {
+function confine(item, angle) {
 
-    if (item.currentAngle != undefined && item.currentAngle != angle){
+    var confined = true;
 
-        var turningVelocity = (unitTypes[item.type].behaviour.turningVelocity /(100 * frame)) * Math.PI * 2;
-        var fullAngle = angleBetween(angle, item.currentAngle);
+    var distance = dist(item.x, item.y, item.team.x, item.team.y);
+    var gap = item.team.antData[item.type].speed + offset + item.size;
 
-        if (fullAngle.angle > turningVelocity) {
-            angle = item.currentAngle + (fullAngle.sign * turningVelocity);
-        } 
+
+    if(item.confinement == 'outer') {
+
+        if (distance + gap >= item.team.territoryRadius) {
+
+            if (item.redirected != 'turnedIn') {
+
+                var dx = item.team.x - item.x
+                var dy = item.team.y - item.y
+                angle = checkAngle(vectorToAngle(dx, dy));
+
+                if (distance + offset < item.team.territoryRadius) {
+                    angle += 0.1
+                }
+
+                item.redirected = 'turnedIn';
+            }
+
+            confined = false;
+            item.location = 'outer';
+
+        } else if (distance - gap <= item.team.safeRadius && (distance - gap > item.team.size)) {
+
+            if (item.team.territoryRadius - item.team.safeRadius  >= item.size * 3) {
+
+                if (item.redirected != 'turnedOut') {
+
+                    var dx = item.team.x - item.x
+                    var dy = item.team.y - item.y
+                    angle = checkAngle(vectorToAngle( -dx, -dy));
+
+                    if (distance + offset> item.team.safeRadius) {
+                        angle -= 1
+                    }
+
+                    item.redirected = 'turnedOut';
+
+                }
+                confined = false;
+            }
+
+            item.location = 'inner';
+
+        } else if (distance - gap <= item.team.size) {
+
+            if (item.redirected != 'turnedOut') {
+
+                var dx = item.team.x - item.x
+                var dy = item.team.y - item.y
+                angle = checkAngle(vectorToAngle( -dx, -dy));
+
+                angle -= 1
+
+                item.redirected = 'turnedOut';
+
+            }
+            confined =  false;
+            item.location = 'inner';
+        
+
+        } else {
+            item.location = 'outer';
+        }
+
+    } else if(item.confinement == 'inner') {
+
+        if (distance + gap >= item.team.safeRadius || (distance + gap >= item.team.territoryRadius)) {
+
+            if (item.redirected != 'turnedIn') {
+
+                var dx = item.team.x - item.x
+                var dy = item.team.y - item.y
+                angle = checkAngle(vectorToAngle(dx, dy));
+
+                item.redirected = 'turnedIn';
+                
+            }
+
+            confined = false;
+            item.location = 'outer';
+        
+        } else if (distance + gap >= item.team.territoryRadius) {
+
+            if (item.redirected != 'turnedIn') {
+
+                var dx = item.team.x - item.x
+                var dy = item.team.y - item.y
+                angle = checkAngle(vectorToAngle(dx, dy));
+
+                item.redirected = 'turnedIn';
+                
+            }
+
+            confined = false;
+            item.location = 'outer';
+
+        
+
+        } else if (distance - gap <= item.team.size) {
+
+            if (item.redirected != 'turnedOut') {
+
+                var dx = item.team.x - item.x
+                var dy = item.team.y - item.y
+                angle = checkAngle(vectorToAngle( -dx, -dy));
+
+                // if (distance + offset> item.team.size) {
+                //     angle -= 1
+                // }
+
+                item.redirected = 'turnedOut';
+
+            }
+            confined = false;
+
+            item.location = 'inner';
+
+        } else {
+            item.location = 'inner';
+        }
     }
 
-    return angle
+    return {'angle':angle, 'confined':confined}
 }
 
 function getClosest(item, units) {
@@ -65,16 +199,6 @@ function getClosest(item, units) {
     }
 
     return closest
-}
-
-function retreatCheck(item, angle) {
-
-    if (item.mStatus == 'retreating' || item.mStatus == 'routed') {
-
-        angle = checkAngle(angle + Math.PI);
-    }
-
-    return angle;
 }
 
 

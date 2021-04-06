@@ -31,6 +31,8 @@ export function vectorToAngle(dx,dy) {
             
         }
 
+    } else {
+        angle = Math.random() * 2 * Math.PI;
     }
 
     return checkAngle(angle);

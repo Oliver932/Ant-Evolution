@@ -1,5 +1,4 @@
 import {dist, checkAngle, vectorToAngle, angleBetween, angleRange, angleToVector} from './vectorFunctions.js';
-import {unitNames, unitTypes} from './unitData.js';
 import {scale, offset} from './Settings.js';
 
 // item and individual units require size, x, y, behaviour.range, status, orientation and team properties
@@ -11,10 +10,7 @@ export default function smartMove(item, travel, travelAngle, units) {
     if (travelAngle != undefined) {
 
 
-        var objects = withinRange(item, units);
-
-        // var directions = ['CW', 'ACW'];
-        // var direction = directions[Math.round(Math.random())];
+        var objects = withinRange(item, units, travel);
 
         var direction = 'CW';
 
@@ -27,6 +23,8 @@ export default function smartMove(item, travel, travelAngle, units) {
         var newTravel = travel;
 
         if (objects.length > 0) {
+
+            item.collision = true;
             var resolve = false;
 
 
@@ -40,6 +38,7 @@ export default function smartMove(item, travel, travelAngle, units) {
 
                 if (data.repeat == false || data.angleAdjustment == 0) {
                     resolve = true
+                    item.collision = false;
                     break;
                 }
 
@@ -73,10 +72,16 @@ export default function smartMove(item, travel, travelAngle, units) {
                 newTravel = 0;
             }
 
+            if (item.label == 'searching') {
+                item.currentAngle = angle + (Math.random() - 0.5) * Math.PI;
+                item.redirected = false;
+                // item.currentAngle = angle;
+            }
+
         }
 
         doMove(item, angle, newTravel);
-        edgeCheck(item);
+        // edgeCheck(item);
 
     } else {
         item.status = 'static';
@@ -95,10 +100,6 @@ function moderateAngle(item, travel, travelAngle, objects, restrict, direction){
             const obj = objects[index];
 
             var gap = item.size + offset + obj.size;
-
-            if (item.team != obj.team) {
-                gap += (unitTypes[item.type].behaviour.range * item.size);
-            }
 
             var data = obstacleData(item.x, item.y, obj.x, obj.y, travel, travelAngle, gap);
 
@@ -232,14 +233,6 @@ function doMove(item, angle, travel) {
         item.status = 'static';
     } else if (item.status != 'engaged') {
         item.status = 'moving';
-
-        if (Math.abs(dx) > unitTypes[item.type].mStatuses.retreating.speed) {
-            if (Math.sign(dx) == -1) {
-                item.orientation = 'L';
-            } else {
-                item.orientation = 'R';
-            }
-        }
     }
 
     item.x += dx
@@ -250,7 +243,7 @@ function doMove(item, angle, travel) {
 
 }
 
-function withinRange(item, units){
+function withinRange(item, units, speed){
 
 
     var obstructions = [];
@@ -261,18 +254,11 @@ function withinRange(item, units){
 
         var gap = opponent.size + item.size + offset;
 
-        if (opponent.team != item.team) {
-            gap += unitTypes[item.type].behaviour.range * item.size
-        }
-
-
-
-
         if (item != opponent) {
 
             var distance = dist(item.x, item.y, opponent.x, opponent.y);
 
-            if (distance - gap <= unitTypes[item.type].mStatuses[item.mStatus].speed) {
+            if (distance - gap <= speed) {
                 obstructions.push(opponent);
             }
         }
